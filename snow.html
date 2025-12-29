@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Snowy Christmas</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #000;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let w, h;
+function resize() {
+  w = canvas.width = window.innerWidth;
+  h = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+/* ---------- TEXT MASK ---------- */
+const textCanvas = document.createElement("canvas");
+const textCtx = textCanvas.getContext("2d");
+
+function drawTextMask() {
+  textCanvas.width = w;
+  textCanvas.height = h;
+
+  textCtx.clearRect(0, 0, w, h);
+  textCtx.fillStyle = "#000";
+  textCtx.textAlign = "center";
+  textCtx.textBaseline = "middle";
+  textCtx.font = `bold ${Math.min(w * 0.18, 220)}px serif`;
+  textCtx.fillText("Merry Christmas", w / 2, h / 2);
+}
+drawTextMask();
+
+/* ---------- SNOW ---------- */
+const snowflakes = [];
+const MAX_SNOW = 400;
+
+class Snowflake {
+  constructor() {
+    this.reset();
+    this.y = Math.random() * h;
+  }
+  reset() {
+    this.x = Math.random() * w;
+    this.y = -10;
+    this.r = Math.random() * 1.5 + 0.5;
+    this.speed = Math.random() * 0.4 + 0.2;
+    this.drift = Math.random() * 0.3 - 0.15;
+  }
+  update() {
+    this.y += this.speed;
+    this.x += this.drift;
+
+    if (this.y > h) this.reset();
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+for (let i = 0; i < MAX_SNOW; i++) {
+  snowflakes.push(new Snowflake());
+}
+
+/* ---------- SNOW ACCUMULATION ---------- */
+let snowLayer = ctx.createImageData(w, h);
+let meltTimer = 0;
+
+function accumulateSnow() {
+  const textData = textCtx.getImageData(0, 0, w, h).data;
+  const snowData = snowLayer.data;
+
+  for (let flake of snowflakes) {
+    const x = Math.floor(flake.x);
+    const y = Math.floor(flake.y);
+
+    if (x < 0 || y < 0 || x >= w || y >= h) continue;
+
+    const idx = (y * w + x) * 4;
+
+    // only accumulate on text pixels
+    if (textData[idx + 3] > 0) {
+      snowData[idx] = 255;
+      snowData[idx + 1] = 255;
+      snowData[idx + 2] = 255;
+      snowData[idx + 3] = 255;
+    }
+  }
+}
+
+function meltSnow() {
+  const snowData = snowLayer.data;
+  for (let i = 3; i < snowData.length; i += 4) {
+    snowData[i] *= 0.995;
+  }
+}
+
+/* ---------- LOOP ---------- */
+function animate() {
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.fillStyle = "#fff";
+
+  for (let flake of snowflakes) {
+    flake.update();
+    flake.draw();
+  }
+
+  accumulateSnow();
+
+  meltTimer++;
+  if (meltTimer > 300) meltSnow();
+  if (meltTimer > 800) {
+    snowLayer = ctx.createImageData(w, h);
+    meltTimer = 0;
+  }
+
+  ctx.putImageData(snowLayer, 0, 0);
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>
